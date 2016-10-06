@@ -17,7 +17,7 @@ depths = (-1e-15*(xs - 50000)**4 + 8000 -
           3000*np.exp(-(xs - 70000)**2/(10000**2)))
 #depths[60:80] -= 2000
 depths -= depths.min()  # Reduce depths to zero
-props = {'density': -300}
+props = {'density': -200}
 model = Polygon(np.transpose([xs, depths]), props)
 x = np.linspace(0, 100000, 100)
 z = -100*np.ones_like(x)
