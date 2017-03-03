@@ -6,25 +6,10 @@ import pandas as pd
 from datetime import datetime, date, time
 
 ### setup params
-# if os.path.isdir('/Volumes/C/'): basedir = '/Volumes/C/data/Antarctic/OIB/GRAVITY/'
-# else: basedir = '/Volumes/BOOTCAMP/data/Antarctic/OIB/GRAVITY/'
-
-basedir = '/Users/dporter/Documents/data_local/Antarctica/OIB/'
-datadir = 'IGGRV1B'
-timedir = '2009.10.31'
-suffix = '.txt'
+if os.path.isdir('/Volumes/C/'): basedir = '/Volumes/C/data/Antarctic/OIB/GRAVITY/'
+else: basedir = '/Volumes/BOOTCAMP/data/Antarctic/OIB/GRAVITY/'
 infile = 'IGGRV1B_20091031_11020500_V016'
-
-### Read ascii file as csv
-headers = ('LAT','LONG','DATE','DOY','TIME','FLT','PSX','PSY','WGSHGT','FX','FY','FZ','EOTGRAV','FACOR','INTCOR','FAG070','FAG100','FAG140','FLTENVIRO')
-# df = pd.read_csv(os.path.join(basedir, datadir, timedir, infile + suffix),
-#                  delimiter=r"\s+", skiprows=69)
-df = pd.read_csv(os.path.join(basedir, datadir, timedir, infile + suffix),
-                 delimiter=r"\s+", skiprows=70, header=;None', names=headers)
-# df = pd.read_csv(os.path.join(basedir, datadir, timedir, infile + suffix),
-#                  delimiter=",", na_values='-9999.00')
-subframe = 2009103102021
-
+suffix = '.txt'
 
 ### Read ascii file as csv
 #metadata ends on line 69, column names on line 70
