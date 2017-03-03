@@ -3,30 +3,73 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+pd.set_option("display.max_rows",30)
+pd.set_option("precision",13)
+pd.set_option('expand_frame_repr', False)
 from datetime import datetime, date, time
 
 ### setup params
-if os.path.isdir('/Volumes/C/'): basedir = '/Volumes/C/data/Antarctic/OIB/RADAR/csv'
-else: basedir = '/Volumes/BOOTCAMP/data/Antarctic/OIB/RADAR/csv'
-infile = '2009_Antarctica_DC8'
+basedir = '/Users/dporter/Documents/data_local/Antarctica/OIB/'
+datadir = 'IRMCR2'
+timedir = '2009.10.31'
+# infile = '2009_Antarctica_DC8'
+infile = 'IRMCR2_20091031_01'
 suffix = '.csv'
-
 ### Read ascii file as csv
-#headers = ('LAT','LONG','DATE','DOY','TIME','FLT','PSX','PSY','WGSHGT','FX','FY','FZ','EOTGRAV','FACOR','INTCOR','FAG070','FAG100','FAG140','FLTENVIRO')
-df = pd.read_csv(os.path.join(basedir,infile+suffix),delimiter=",", na_values='-9999.00')
-#df.replace('-9999.00', np.nan)
-
-### do some DATETIME operations
-#df['DATE'] = str(df['FRAME'][0])[:8]
-
+df = pd.read_csv(os.path.join(basedir, datadir, timedir, infile + suffix),
+                 delimiter=",", na_values='-9999.00')
 #df['DATE'] = pd.DataFrame(list(df.FRAMESTR.str[:8]))
 df['FRAMESTR'] = df['FRAME'].apply(str)
 df['DATE'] = pd.to_datetime(list(df.FRAMESTR.str[:8]),format='%Y%m%d')
 del df['FRAMESTR']
 df['UNIX']=df['DATE'].astype(np.int64) // 10**9
-df['UNIX']=df['UNIX']+df['TIME']
+df['UNIX']=df['UNIX']+df['TIME'].astype(np.float64)
 df['iunix'] = pd.to_datetime(df['UNIX'],unit='s')
 df = df.set_index('iunix')
+df.index.astype(np.int64)[0:7] // 10 ** 9
+
+# #########################################################
+# GRAVITY
+datadir = 'IGGRV1B'
+timedir = '2009.10.31'
+suffix = '.txt'
+infile = 'IGGRV1B_20091031_11020500_V016'
+headers = ('LAT','LONG','DATE','DOY','TIME','FLT','PSX','PSY','WGSHGT','FX','FY','FZ','EOTGRAV','FACOR','INTCOR','FAG070','FAG100','FAG140','FLTENVIRO')
+grv = pd.read_csv(os.path.join(basedir, datadir, timedir, infile + suffix), delimiter=r"\s+", skiprows=70, header=None, names=headers)
+### do some DATETIME operations
+grv['DATETIME'] = (grv.DATE*1e5)+grv.TIME
+grv['DATE'] = pd.to_datetime(grv['DATE'],format='%Y%m%d')
+grv['UNIX']=grv['DATE'].astype(np.int64) // 10**9
+grv['UNIX']=grv['UNIX']+grv['TIME']
+grv['iunix'] = pd.to_datetime(grv['UNIX'],unit='s')
+grv = grv.set_index('iunix')
+grv.index.astype(np.int64)[0:7] // 10 ** 9
+
+
+# #########################################################
+# print "******************"
+# print "Original Radar Data"
+# print "******************"
+# print(df.columns)
+# print(df.dtypes)
+#
+# print(df.shape)
+# print(df.head(5))
+print(df[['TIME','UNIX','ELEVATION']].head(5))
+
+# ###Subsample all to 2 Hz
+rad2hz = {}
+rad2hz = df.resample('500L').mean().bfill()   #mean,median,mode???
+# atm2hz = atm.resample('500L').mean()
+rad2hz.rename(columns={'SURFACE': 'SURFACE_radar'}, inplace=True)
+# print "******************"
+# print "2 Hz Radar Data"
+# print "******************"
+# print(rad2hz.columns)
+# print(rad2hz.shape)
+# print(rad2hz.head(5))
+print(rad2hz[['TIME','UNIX','ELEVATION']].head(5))
+
 
 ### some flight diagnostics
 #print "%0.1f hour flight" % ((max(df.DATETIME)-min(df.DATETIME))/3600)

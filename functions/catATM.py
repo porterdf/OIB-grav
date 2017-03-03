@@ -49,9 +49,10 @@ with open(output_filename, 'w') as f:
 	for filename in filenames:
 		print 'Extracting records from {0}...'.format(filename)
 		# Get date from filename
-		date = '20' + filename[:6]
+		# date = '20' + filename[:6]	# this is Linky's original code
+		date = filename[7:15]
 		prevTime = 0
-		
+
 		# Loop through lines in icessn file
 		for line in open(filename):
 			# Make sure records have the correct number of words (11)
@@ -61,7 +62,7 @@ with open(output_filename, 'w') as f:
 				# If seconds of day roll over to next day
 				if gpsTime < prevTime:
 					date = str(int(date) + 1)
-				
+
 				# Determine UTC offset from date
 				UTCoffset = getUTCoffset(int(date[:4]), int(date[4:6]), int(date[6:]))
 				# Calculate "normal-person time"
@@ -70,7 +71,7 @@ with open(output_filename, 'w') as f:
 					utc += 86400
 				utc = str(utc).split('.')
 				utc = utc[0] + '.' + utc[1].ljust(4, '0')
-				
+
 				# Create new data record (with EOL in "line" variable)
 				newline = '{0} {1} {2}'.format(date, utc, line)
 				print newline

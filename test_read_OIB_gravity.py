@@ -6,32 +6,46 @@ import pandas as pd
 from datetime import datetime, date, time
 
 ### setup params
-if os.path.isdir('/Volumes/C/'): basedir = '/Volumes/C/data/Antarctic/OIB/GRAVITY/'
-else: basedir = '/Volumes/BOOTCAMP/data/Antarctic/OIB/GRAVITY/'
-infile = 'IGGRV1B_20091031_11020500_V016'
+# if os.path.isdir('/Volumes/C/'): basedir = '/Volumes/C/data/Antarctic/OIB/GRAVITY/'
+# else: basedir = '/Volumes/BOOTCAMP/data/Antarctic/OIB/GRAVITY/'
+
+basedir = '/Users/dporter/Documents/data_local/Antarctica/OIB/'
+datadir = 'IGGRV1B'
+timedir = '2009.10.31'
 suffix = '.txt'
+infile = 'IGGRV1B_20091031_11020500_V016'
+
+### Read ascii file as csv
+headers = ('LAT','LONG','DATE','DOY','TIME','FLT','PSX','PSY','WGSHGT','FX','FY','FZ','EOTGRAV','FACOR','INTCOR','FAG070','FAG100','FAG140','FLTENVIRO')
+# df = pd.read_csv(os.path.join(basedir, datadir, timedir, infile + suffix),
+#                  delimiter=r"\s+", skiprows=69)
+df = pd.read_csv(os.path.join(basedir, datadir, timedir, infile + suffix), delimiter=r"\s+", skiprows=70, header=None, names=headers)
+# df = pd.read_csv(os.path.join(basedir, datadir, timedir, infile + suffix),
+#                  delimiter=",", na_values='-9999.00')
+subframe = 2009103102021
+
 
 ### Read ascii file as csv
 #metadata ends on line 69, column names on line 70
-#headers = ('LAT','LONG','DATE','DOY','TIME','FLT','PSX','PSY','WGSHGT','FX','FY','FZ','EOTGRAV','FACOR','INTCOR','FAG070','FAG100','FAG140','FLTENVIRO')
-df = pd.read_csv(os.path.join(basedir,infile+suffix),delimiter=r"\s+",skiprows=69)
-#headers = [(df.columns[1:df.shape[1]]),'temp']
-headers = df.columns[1:df.shape[1]]
-print df.columns
-print headers
-df.rename(columns=dict(zip(df.columns,headers)), inplace=True)
-#df['ENVIRO'] = df.columns[19]
-print df.columns
-df.drop(df.columns[19],axis=1,inplace=True,errors='ignore')
-print df.columns
+# #headers = ('LAT','LONG','DATE','DOY','TIME','FLT','PSX','PSY','WGSHGT','FX','FY','FZ','EOTGRAV','FACOR','INTCOR','FAG070','FAG100','FAG140','FLTENVIRO')
+# df = pd.read_csv(os.path.join(basedir,infile+suffix),delimiter=r"\s+",skiprows=69)
+# #headers = [(df.columns[1:df.shape[1]]),'temp']
+# headers = df.columns[1:df.shape[1]]
+# print df.columns
+# print headers
+# df.rename(columns=dict(zip(df.columns,headers)), inplace=True)
+# #df['ENVIRO'] = df.columns[19]
+# print df.columns
+# df.drop(df.columns[19],axis=1,inplace=True,errors='ignore')
+# print df.columns
 
 ### do some DATETIME operations
 df['DATETIME'] = (df.DATE*1e5)+df.TIME
 df['DATE'] = pd.to_datetime(df['DATE'],format='%Y%m%d')
 df['UNIX']=df['DATE'].astype(np.int64) // 10**9
 df['UNIX']=df['UNIX']+df['TIME']
-df['iunix'] = pd.to_datetime(df['UNIX'],unit='s')
-df = df.set_index('iunix')
+df['index'] = pd.to_datetime(df['UNIX'],unit='s')
+df = df.set_index('index')
 
 ### some flight diagnostics
 #print "%0.1f hour flight" % ((max(df.DATETIME)-min(df.DATETIME))/3600)

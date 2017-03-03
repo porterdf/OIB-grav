@@ -9,13 +9,16 @@ from datetime import datetime, date, time
 ### setup params
 if os.path.isdir('/Volumes/C/'): basedir = '/Volumes/C/data/Antarctic/OIB/ATM/2009_AN_NASA_ATM'
 else: basedir = '/Volumes/BOOTCAMP/data/Antarctic/OIB/ATM/2009_AN_NASA_ATM'
-infile = '2009_AN_NASA_ATM_all'
-suffix = '.txt'
+basedir = '/Users/dporter/Documents/data_local/Antarctica/OIB/'
+timedir = '2009.10.31'
+datadir = 'ILATM2'
+infile = 'ILATM2_2009.10.31_all'
+suffix = '.csv'
 
 ### Read ascii file as csv
 headers = ('DATE','TIME','TIME2','LAT','LON','SURFACE','SLOPESN','SLOPEWE','RMS','NUMUSED','NUMOMIT','DISTRIGHT','TRACKID')
-df = pd.read_csv(os.path.join(basedir,infile+suffix),delimiter=r"\s+",header=None)
-df.rename(columns=dict(zip(df.columns,headers)), inplace=True)
+df = pd.read_csv(os.path.join(basedir,datadir,timedir,infile+suffix),header=None) #,delimiter=r"\s+"
+df.rename(columns=dict(zip(df.columns,headers)), inplace=True) 
 del df['TIME2']
 
 ### do some DATETIME operations

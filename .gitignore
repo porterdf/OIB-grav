@@ -1,2 +1,4 @@
 /data
 /figs
+*.csv
+*.DS_Store
