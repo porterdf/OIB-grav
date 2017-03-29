@@ -273,7 +273,7 @@ def oib_mapplot_hilite(lon, lat, field, data, units='', ptitle='test_map', pfile
     # from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
     # import cartopy.feature
     try:
-        plt.figure(figsize=(8, 10))
+        plt.figure(figsize=(8, 8))
         ax = plt.axes(projection=ccrs.PlateCarree())
         plt.scatter(data['LONG'], data['LAT'], c='black', s=1, transform=ccrs.PlateCarree())
         plt.scatter(lon, lat, c=field, cmap=cm.jet, s=15, transform=ccrs.PlateCarree())
