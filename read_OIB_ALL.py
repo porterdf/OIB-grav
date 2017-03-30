@@ -1,10 +1,10 @@
-import sys
-import os
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-import seaborn as sns
-from datetime import datetime, date, time
+# import sys
+# import os
+# import numpy as np
+# import matplotlib.pyplot as plt
+# import matplotlib.cm as cm
+# import seaborn as sns
+# from datetime import datetime, date, time
 from my_OIB_functions import *
 
 def make_oib_csv(timedir, make_plots=False):
@@ -101,14 +101,13 @@ def make_oib_csv(timedir, make_plots=False):
     df.loc[df['D_gravmask'] == 0, 'D_gravmask'] = 1
     dflist = {}
     dflst = [g for _, g in df.groupby((df.D_gravmask.diff() != 0).cumsum())]
-    submode = 0
     for dnum, dname in enumerate(dflst, start=0):
         ### Add LINE channel
         # dflst[dnum].loc[:, 'LINE'] = str(dflst[dnum]['FLT'][0]) + '.' + str(abs(dflst[dnum]['LAT'][0] * 1e3))[:4]
         dflst[dnum].loc[:, 'LINE'] = str(int(dflst[dnum]['UNIX'][0]))
         # mode = dflst[0].mode()['SURFACE_atm'][0]
         mode = min(np.mean(dflst[dnum]['SURFACE_atm'][:10]), np.mean(dflst[dnum]['SURFACE_atm'][10:]))
-        if mode < 50:
+        if mode < 20:
             clevel = mode
         else:
             clevel = -10
@@ -159,13 +158,12 @@ def make_oib_csv(timedir, make_plots=False):
     '''
     Save to CSV
     '''
-    df2.to_csv('OIB_ANT_'+str(df2['DATE'][0])[:10]+'.csv')
+    df2.to_csv('data/agg2invert/OIB_ANT_'+str(df2['DATE'][0])[:10]+'.csv')
 
 
 if __name__ == '__main__':
     basedir = '/Users/dporter/Documents/data_local/Antarctica/OIB/'
     datadir = 'IGGRV1B'
-
     ### Run through each directory
     # # directories = [x[0] for x in os.walk(os.path.join(basedir, datadir))]
     directories = next(os.walk(os.path.join(basedir, datadir)))[1]

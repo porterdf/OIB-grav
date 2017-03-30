@@ -196,7 +196,7 @@ def mapplotOIBlocal(x, y, z, title, units, range, colormap):
     m.drawparallels(np.arange(-80., 81., 5.), labels=[1, 0, 0, 0])
     m.drawmeridians(np.arange(-180., 181., 5.), labels=[0, 0, 0, 1])
     # Define our longitude and latitude points
-    # We have to use .values because of a wierd bug when passing pandas data
+    # We have to use .values because of a weird bug when passing pandas data
     # to basemap.
     [x1, y1] = m(x.values, y.values)
     # Plot them using round markers of size 6
@@ -226,7 +226,7 @@ def oib_lineplot(data, ptitle='test_lineplot', pname='test_lineplot'):
     data['FAG070'].where((data['FLTENVIRO'] == 0)).plot(ax=axes[0], legend=True, label='Normal', style='k-')
     # data['FAG070'].where((data['FLTENVIRO'] == -1)).plot(ax=axes[0], legend=True, label='Missing', style='b-')
     data['ELEVATION'].plot(ax=axes[1], legend=True, style='y.')
-    data['TOPOGRAPHY_radar'].plot(ax=axes[1], legend=True, color='blue')
+    data['TOPOGRAPHY_radar'].plot(ax=axes[1], legend=True, marker=".", color='blue')
     data['HYDROAPPX'].plot(ax=axes[1], legend=True, color='grey')
     data['SURFACE_atm'].where((data['NUMUSED'] > 77)).plot(ax=axes[1], legend=True, color='cyan')
     data['ICEBASE'].plot(ax=axes[1], legend=True, color='brown')
