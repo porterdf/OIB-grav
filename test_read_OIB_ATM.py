@@ -37,7 +37,7 @@ df.groupby(df.index.day).median().head(10)
 
 ### Bin
 numbins = abs(int(np.min(r.DATETIME/1e5)-int(np.max(r.DATETIME/1e5))))
-numbins = abs(int(np.min(r.UNIX)-int(np.max(r.UNIX)))/86400)
+# numbins = abs(int(np.min(r.UNIX)-int(np.max(r.UNIX)))/86400)
 bins = np.linspace(int(np.min(r.DATETIME/1e5)), int(np.max(r.DATETIME/1e5)), numbins)
 r['DAY'] = np.digitize(r.DATETIME/1e5, bins) - 1
 

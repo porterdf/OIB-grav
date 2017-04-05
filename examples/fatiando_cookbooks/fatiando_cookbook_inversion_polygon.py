@@ -15,10 +15,15 @@ import numpy as np
 xs = np.linspace(0, 100000, 100)[::-1]
 depths = (-1e-15*(xs - 50000)**4 + 8000 -
           3000*np.exp(-(xs - 70000)**2/(10000**2)))
-#depths[60:80] -= 2000
+# depths[60:80] -= 2000  # DFP testing the synthetic data
+# depths[80:-1] = depths[80]  # DFP testing the synthetic data
 depths -= depths.min()  # Reduce depths to zero
 props = {'density': -300}
+
+# Make a polygon from the synthetic data
 model = Polygon(np.transpose([xs, depths]), props)
+
+# Forward Model to get FAG
 x = np.linspace(0, 100000, 100)
 z = -100*np.ones_like(x)
 data = utils.contaminate(talwani.gz(x, z, [model]), 0.5, seed=0)
@@ -27,17 +32,18 @@ data = utils.contaminate(talwani.gz(x, z, [model]), 0.5, seed=0)
 misfit = PolygonalBasinGravity(x, z, data, 50, props, top=0)
 regul = Smoothness1D(misfit.nparams)
 solver = misfit + 1e-4*regul
+
 # This is a non-linear problem so we need to pick an initial estimate
 initial = 3000*np.ones(misfit.nparams)
 solver.config('levmarq', initial=initial).fit()
 
 mpl.figure()
 mpl.subplot(2, 1, 1)
-mpl.plot(x, data, 'ok', label='observed')
-mpl.plot(x, solver[0].predicted(), '-r', linewidth=2, label='predicted')
+mpl.plot(x, data, 'ok', label='Gravity Data')
+mpl.plot(x, solver[0].predicted(), '-r', linewidth=2, label='predicted Gravity')
 mpl.legend()
 ax = mpl.subplot(2, 1, 2)
-mpl.polygon(model, fill='gray', alpha=0.5, label='True')
+mpl.polygon(model, fill='gray', alpha=0.5, label='Polygon')
 # The estimate_ property of our solver gives us the estimate basin as a polygon
 # So we can directly pass it to plotting and forward modeling functions
 mpl.polygon(solver.estimate_, style='o-r', label='Inverted')
@@ -45,8 +51,8 @@ ax.invert_yaxis()
 mpl.legend()
 mpl.show()
 
-columns = ['data','depths']
-values = np.array([data,depths])
-df = pd.DataFrame(data=values.T,columns=columns, index = xs)
-df.to_csv('Fatiando_2DBasin_forGMSYS.csv')
-
+# columns = ['data','depths']
+# values = np.array([data,depths])
+# df = pd.DataFrame(data=values.T,columns=columns, index = xs)
+# df.to_csv('Fatiando_2DBasin_forGMSYS.csv')
+#
