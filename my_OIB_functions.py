@@ -14,6 +14,36 @@ def alphanum_key(s):
     return key
 
 
+def haversine(origin, destination):
+    # Source: http://www.platoscave.net/blog/2009/oct/5/calculate-distance-latitude-longitude-python/
+    import math
+    lat1, lon1 = origin
+    lat2, lon2 = destination
+    radius = 6371  # km
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2) * math.sin(dlat / 2) + math.cos(math.radians(lat1)) \
+                                                  * math.cos(math.radians(lat2)) * math.sin(dlon / 2) * math.sin(
+        dlon / 2)
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    d = radius * c
+    return d
+
+
+def make_outline(top, bottom):
+    outline = np.append(top[0], np.concatenate([np.append(top, top[-1:]), np.append(bottom[-1:], bottom[::-1])], axis=0))
+    outline = np.append(outline, bottom[0])
+    outline = np.append(outline, top[0])
+    return outline
+
+
+def make_outline_dist(x, pad=1e6):
+    xs = np.append(-pad, np.concatenate([np.append(x, np.max(x)+pad), np.append(np.max(x)+pad, x[::-1])], axis=0))
+    xs = np.append(xs, -pad)
+    xs = np.append(xs, -pad)
+    return xs
+
+
 def catATM(basedir, timedir):
     datadir = 'ILATM2'
     # infile = '2009_AN_NASA_ATM_all'
@@ -236,6 +266,51 @@ def oib_lineplot(data, ptitle='test_lineplot', pname='test_lineplot'):
     return
 
 
+def talwani_lineplot(x, fag070, gz_adj, polygons, rmse, ptitle='test_talwaniplot', pname='test_talwaniplot'):
+    """
+    :param data:
+    :param ptitle:
+    :param pname:
+    :return:
+    """
+    from fatiando.vis import mpl
+    import matplotlib.ticker as ticker
+    # import matplotlib.pyplot as plt
+
+
+    fig = mpl.figure(num=None, figsize=(8, 5), dpi=80, facecolor='w', edgecolor='k')
+    mpl.axis('scaled')
+    ax1 = mpl.subplot(2, 1, 1)
+    mpl.title(ptitle)
+    mpl.plot(x, gz_adj, '-r', linewidth=2, label='Modeled (constant)')
+    # mpl.plot(x, gz-fag070, '-b', linewidth=1)
+    mpl.plot(x, fag070, color='k', linestyle="None", marker=',', label='FAG070')
+    mpl.xlim(min(x), max(x))
+    ticks_x = ticker.FuncFormatter(lambda x, pos: '{0:g}'.format(x / 1e3))
+    ax1.xaxis.set_major_formatter(ticks_x)
+    mpl.ylabel("mGal")
+    mpl.legend()
+    # ax1.annotate('rmse: '+str(int(rmse))+' mGal',
+    #              xy=(min(x)*1.1, np.mean(gz)*1.1), xytext=(min(x)*1.1, np.mean(gz)*1.1))
+    if not np.isnan(rmse):
+        ax1.annotate('rmse: ' + str(int(rmse)) + ' mGal',
+                     xy=(x[2], np.mean(gz_adj)), xytext=(x[2], np.mean(gz_adj)))
+    ###
+    ax2 = mpl.subplot(2, 1, 2)
+    mpl.polygon(polygons[0], '.-k', linewidth=1, fill='cyan', alpha=0.5)
+    mpl.polygon(polygons[1], '.-k', linewidth=1, fill='orange', alpha=0.5)
+    mpl.xlim(min(x), max(x))
+    mpl.ylim(-1200, 2000)
+    mpl.xlabel("Distance [km]")
+    mpl.ylabel("Ellipsoid Height [m]")
+    ax2.xaxis.set_major_formatter(ticks_x)
+    # mpl.savefig('figs/' + str(dflst[dnum]['LINE'].values[0]) + '_forward_lineplot.png', bbox_inches='tight')
+    # mpl.suptitle(ptitle, y=0.98)
+    mpl.savefig(pname, bbox_inches='tight')   # save the figure to file
+    mpl.close(fig)
+    return
+
+
 def oib_mapplot(lon, lat, field, units='', ptitle='test_map', pfile='test_map'):
     import matplotlib.pyplot as plt
     import cartopy.crs as ccrs
@@ -299,3 +374,4 @@ def oib_mapplot_hilite(lon, lat, field, data, units='', ptitle='test_map', pfile
     except IndexError:
         print "Couldn't make Map Plot."
     return
+
