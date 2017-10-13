@@ -178,7 +178,8 @@ def forward_oib(infile, make_plots=False):
     # oib_mapplot(df2['LONG'].where((df2['D_gravmask'] != -1)), df2['LAT'].where((df2['D_gravmask'] != -1)),
     #             df2['FLTENVIRO'].where((df2['D_gravmask'] != -1)), 'm', 'FLTENVIRO '+str(df2['DATE'].values[0])[:10],
     #             os.path.join(pdir, str(df2['DATE'].values[0])[:10]+'_mapplot_talwani_FLTENVIRO_ALL.png'))
-    oib_mapplot(df2['LONG'], df2['LAT'], df2['rmse'], 'm',
+    if make_plots:
+        oib_mapplot(df2['LONG'], df2['LAT'], df2['rmse'], 'm',
                 'rmse '+str(df2['DATE'].values[0])[:10],
                 os.path.join(pdir, str(df2['DATE'].values[0])+'_mapplot_Talwani_rmse_ALL.pdf'))
 
@@ -193,7 +194,7 @@ if __name__ == '__main__':
     datadir = 'agg2invert'
     suffix = '.csv'
     ### Run through each directory
-    pattern = os.path.join(basedir, datadir, 'OIB_ANT_2009-10-16*' + suffix)
+    pattern = os.path.join(basedir, datadir, 'OIB_ANT_*' + suffix)
     # pattern = './data/NetCDF/10103/R10103_003*.nc'
     filenames = sorted(glob(pattern))  # , key=alphanum_key)
     filecounter = len(filenames)

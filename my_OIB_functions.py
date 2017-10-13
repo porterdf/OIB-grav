@@ -300,7 +300,7 @@ def talwani_lineplot(x, fag070, gz_adj, polygons, rmse, ptitle='test_talwaniplot
     mpl.polygon(polygons[0], '.-k', linewidth=1, fill='cyan', alpha=0.5)
     mpl.polygon(polygons[1], '.-k', linewidth=1, fill='orange', alpha=0.5)
     mpl.xlim(min(x), max(x))
-    mpl.ylim(-1200, 2000)
+    mpl.ylim(-1600, 2000)
     mpl.xlabel("Distance [km]")
     mpl.ylabel("Ellipsoid Height [m]")
     ax2.xaxis.set_major_formatter(ticks_x)
