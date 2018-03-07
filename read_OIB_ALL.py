@@ -7,7 +7,7 @@
 # from datetime import datetime, date, time
 from my_OIB_functions import *
 
-def make_oib_csv(timedir, make_plots=False):
+def make_oib_csv(gravdir, timedir, make_plots=False):
     # -*- coding: utf-8 -*-
     # %load_ext autoreload
     # %autoreload 2
@@ -30,7 +30,7 @@ def make_oib_csv(timedir, make_plots=False):
     '''
     ### Gravity
     grv = {}
-    grv = importOIBgrav(basedir, timedir)
+    grv = importOIBgrav(gravdir, timedir)
 
     ### RADAR
     # infile = 'IRMCR2_20091031_01'
@@ -48,10 +48,10 @@ def make_oib_csv(timedir, make_plots=False):
     Subsample all to 2 Hz
     '''
     rad2hz = {}
-    rad2hz = rad.resample('500L').first().bfill()  # mean,median,mode???
+    rad2hz = rad.resample('500L').first().bfill(limit=1)  # mean,median,mode???
 
     atm2hz = {}
-    atm2hz = atm.resample('500L').first().bfill()  # mean,median,mode???
+    atm2hz = atm.resample('500L').first().bfill(limit=1)  # mean,median,mode???
 
     '''
     Concatenate into single dataframe
@@ -97,6 +97,7 @@ def make_oib_csv(timedir, make_plots=False):
     '''
     Split Dataframe using Gravity quality/presence
     '''
+    print "\n Split Dataframe using Gravity quality/presence"
     df['D_gravmask'] = df['FLTENVIRO']
     df.loc[df['D_gravmask'] == 0, 'D_gravmask'] = 1
     dflist = {}
@@ -118,6 +119,7 @@ def make_oib_csv(timedir, make_plots=False):
         # (clevel - (((dflst[dnum]['SURFACE_atm'] - clevel) * 7.759))
 
     ### Merge back together
+    print "\n Merging back together"
     df2 = {}
     df2 = pd.concat(dflst)
     # df_sub = pd.DataFrame.from_dict(map(dict, dflst))
@@ -126,25 +128,30 @@ def make_oib_csv(timedir, make_plots=False):
     '''
     PLOTS
     '''
+    print "\n Plots"
     # plt.figure(); df_sub.plot(subplots=True,layout=(4,8),figsize=(16, 12));
     # df['BOTTOM'].where((df['FLTENVIRO'] == 0)).plot(legend=True,label='Good',style ='r-');#axes[0,0].set_title('A');
     # df2['BOTTOM'].where((df2['NUMUSED'] > 0)).plot(legend=True,label='Sparse',style ='r-');#axes[0,0].set_title('A');
     ### Loop through segments
     pdir = os.path.join('figs', str(dflst[dnum]['DATE'][0])[:10])
+    print "Plotting directory is ", pdir
     if not os.path.exists(pdir):
         os.makedirs(pdir)
     for dnum, dname in enumerate(dflst, start=0):
         if dnum % 2 != 0:
-            print dnum
+            print "Dnum ", dnum
             if make_plots:
-                '''
-                LINE
-                '''
-                oib_lineplot(dflst[dnum], str(dflst[dnum]['DATE'][0])[:10] + '_L' + str(dflst[dnum]['LINE'][0]),
+                try:
+                    oib_lineplot(dflst[dnum], str(dflst[dnum]['DATE'][0])[:10] + '_L' + str(dflst[dnum]['LINE'][0]),
                              os.path.join(pdir, str(dflst[dnum]['LINE'][0])+'_lineplot.png'))
-                oib_mapplot_hilite(dflst[dnum]['LONG'], dflst[dnum]['LAT'], dflst[dnum]['FAG070'], df2, 'm',
-                            'FAG070 ' + str(dflst[dnum]['DATE'][0])[:10] + '_L' + str(dflst[dnum]['LINE'][0]),
-                            os.path.join(pdir, str(dflst[dnum]['LINE'][0])+'_mapplot_FAG070.png'))
+                except:
+                    print "couldn't lineplot"
+                # try:
+                #     oib_mapplot_hilite(dflst[dnum]['LONG'], dflst[dnum]['LAT'], dflst[dnum]['FAG070'], df2, 'm',
+                #             'FAG070 ' + str(dflst[dnum]['DATE'][0])[:10] + '_L' + str(dflst[dnum]['LINE'][0]),
+                #             os.path.join(pdir, str(dflst[dnum]['LINE'][0])+'_mapplot_FAG070.png'))
+                # except:
+                #     print "couldn't mapplot"
 
     '''
     Map
@@ -167,13 +174,15 @@ if __name__ == '__main__':
     ### Run through each directory
     # # directories = [x[0] for x in os.walk(os.path.join(basedir, datadir))]
     directories = next(os.walk(os.path.join(basedir, datadir)))[1]
-    for dnum,dname in enumerate(directories,start=0):
+    for dnum,dname in enumerate(directories, start=0):
         print dname
+        dirpath = os.path.join(basedir, datadir)
+        print dirpath
         # timedir = '2009.10.31'  # TODO make this user specified or for all flights
-        # timedir = '2009.11.04'
+        # dname = '2010.11.13'
         # sys.exit(main(timedir))
         try:
-            make_oib_csv(dname, True)
+            make_oib_csv(dirpath, dname, True)
         except IOError:
             print 'IOError - Data Not Found'
         except AttributeError:

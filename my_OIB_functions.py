@@ -30,20 +30,6 @@ def haversine(origin, destination):
     return d
 
 
-def make_outline(top, bottom):
-    outline = np.append(top[0], np.concatenate([np.append(top, top[-1:]), np.append(bottom[-1:], bottom[::-1])], axis=0))
-    outline = np.append(outline, bottom[0])
-    outline = np.append(outline, top[0])
-    return outline
-
-
-def make_outline_dist(x, pad=1e6):
-    xs = np.append(-pad, np.concatenate([np.append(x, np.max(x)+pad), np.append(np.max(x)+pad, x[::-1])], axis=0))
-    xs = np.append(xs, -pad)
-    xs = np.append(xs, -pad)
-    return xs
-
-
 def catATM(basedir, timedir):
     datadir = 'ILATM2'
     # infile = '2009_AN_NASA_ATM_all'
@@ -86,7 +72,43 @@ def catATM(basedir, timedir):
                     f.write(newline + '\n')
 
 
+def calc_icebase(sfc, thick):
+    """
+    :param sfc:
+    :param thick:
+    :return:
+    // C0 = icebase_recalc
+    // C1 = surface_recalc
+    // C2 = THICK_redo
+    @var1 = (C1 == DUMMY) ? (DUMMY): (C1 - C2);
+    C0 = (@ var1 >= C1) ? (C1): (@ var1);
+    """
+    # icebase = sfc - thick
+    # icebase = np.where(icebase >= 0, sfc, 0)
+    icebase = np.where((sfc - thick) >= 0, sfc, sfc - thick)
+    return icebase
+
+
+def calc_surface(atm, radar):
+    """
+    :param atm:
+    :param radar:
+    :return:
+    //C0=surface_recalc
+    //C1=SURFACE_atm_redo
+    //C2=TOPOGRAPHY_radar
+    C0 = (C1 != DUMMY) ? (C1) : (C2);
+    """
+    surface = np.where(np.isnan(radar), atm, radar)
+    return surface
+
+
 def importOIBrad(basedir, timedir, infile):
+    """
+    :param basedir:
+    :param timedir:
+    :return:
+    """
     datadir = 'IRMCR2'
     # infile = '2009_Antarctica_DC8'
     suffix = '.csv'
@@ -111,6 +133,11 @@ def importOIBrad(basedir, timedir, infile):
 
 
 def importOIBrad_all(basedir, timedir):
+    """
+    :param basedir:
+    :param timedir:
+    :return:
+    """
     from glob import glob
     basedir = '/Users/dporter/Documents/data_local/Antarctica/OIB/'
     datadir = 'IRMCR2'
@@ -138,11 +165,15 @@ def importOIBrad_all(basedir, timedir):
             df_all = df
         else:
             df_all = pd.concat([df_all, df])
-
     return df_all
 
 
 def importOIBatm(basedir, timedir):
+    """
+    :param basedir:
+    :param timedir:
+    :return:
+    """
     datadir = 'ILATM2'
     infile = 'ILATM2_'
     suffix = '.csv'
@@ -167,14 +198,20 @@ def importOIBatm(basedir, timedir):
 
 
 def importOIBgrav(basedir, timedir):
+    """
+    :param basedir:
+    :param timedir:
+    :return:
+    """
     from glob import glob
-    datadir = 'IGGRV1B'
+    # datadir = 'IGGRV1B/temp'
     # infile = 'IGGRV1B_20091104_13100500_V016'
     # infile = 'IGGRV1B_20091031_11020500_V016'
     # infile = 'IGGRV1B_20091116_15124500_V016'
     suffix = '.txt'
-    pattern = os.path.join(basedir, datadir, timedir, 'IGGRV1B_*' + suffix)
+    pattern = os.path.join(basedir, timedir, 'IGGRV1B_*' + suffix)
     infile = sorted(glob(pattern))  # , key=alphanum_key)
+    print infile
 
     ### Read ascii file as csv
     # metadata ends on line 69, column names on line 70
@@ -182,6 +219,7 @@ def importOIBgrav(basedir, timedir):
         'LAT', 'LONG', 'DATE', 'DOY', 'TIME', 'FLT', 'PSX', 'PSY', 'WGSHGT', 'FX', 'FY', 'FZ', 'EOTGRAV', 'FACOR',
         'INTCOR',
         'FAG070', 'FAG100', 'FAG140', 'FLTENVIRO')
+    # print "Reading gravity file: %s" % infile[0] + suffix %TODO why did I think this would be a list?
     print "Reading gravity file: %s" % infile[0] + suffix
     df = pd.read_csv(infile[0], delimiter=r"\s+", header=None, names=headers, skiprows=70)
     # headers = df.columns[1:df.shape[1]]
@@ -199,6 +237,20 @@ def importOIBgrav(basedir, timedir):
     df.drop(['DATETIME'], axis=1, inplace=True)
     df = df.set_index('iunix')
     return df
+
+
+def make_outline(top, bottom):
+    outline = np.append(top[0], np.concatenate([np.append(top, top[-1:]), np.append(bottom[-1:], bottom[::-1])], axis=0))
+    outline = np.append(outline, bottom[0])
+    outline = np.append(outline, top[0])
+    return outline
+
+
+def make_outline_dist(x, pad=1e6):
+    xs = np.append(-pad, np.concatenate([np.append(x, np.max(x)+pad), np.append(np.max(x)+pad, x[::-1])], axis=0))
+    xs = np.append(xs, -pad)
+    xs = np.append(xs, -pad)
+    return xs
 
 
 def mapplotOIBlocal(x, y, z, title, units, range, colormap):
@@ -266,51 +318,6 @@ def oib_lineplot(data, ptitle='test_lineplot', pname='test_lineplot'):
     return
 
 
-def talwani_lineplot(x, fag070, gz_adj, polygons, rmse, ptitle='test_talwaniplot', pname='test_talwaniplot'):
-    """
-    :param data:
-    :param ptitle:
-    :param pname:
-    :return:
-    """
-    from fatiando.vis import mpl
-    import matplotlib.ticker as ticker
-    # import matplotlib.pyplot as plt
-
-
-    fig = mpl.figure(num=None, figsize=(8, 5), dpi=80, facecolor='w', edgecolor='k')
-    mpl.axis('scaled')
-    ax1 = mpl.subplot(2, 1, 1)
-    mpl.title(ptitle)
-    mpl.plot(x, gz_adj, '-r', linewidth=2, label='Modeled (constant)')
-    # mpl.plot(x, gz-fag070, '-b', linewidth=1)
-    mpl.plot(x, fag070, color='k', linestyle="None", marker=',', label='FAG070')
-    mpl.xlim(min(x), max(x))
-    ticks_x = ticker.FuncFormatter(lambda x, pos: '{0:g}'.format(x / 1e3))
-    ax1.xaxis.set_major_formatter(ticks_x)
-    mpl.ylabel("mGal")
-    mpl.legend()
-    # ax1.annotate('rmse: '+str(int(rmse))+' mGal',
-    #              xy=(min(x)*1.1, np.mean(gz)*1.1), xytext=(min(x)*1.1, np.mean(gz)*1.1))
-    if not np.isnan(rmse):
-        ax1.annotate('rmse: ' + str(int(rmse)) + ' mGal',
-                     xy=(x[2], np.mean(gz_adj)), xytext=(x[2], np.mean(gz_adj)))
-    ###
-    ax2 = mpl.subplot(2, 1, 2)
-    mpl.polygon(polygons[0], '.-k', linewidth=1, fill='cyan', alpha=0.5)
-    mpl.polygon(polygons[1], '.-k', linewidth=1, fill='orange', alpha=0.5)
-    mpl.xlim(min(x), max(x))
-    mpl.ylim(-1600, 2000)
-    mpl.xlabel("Distance [km]")
-    mpl.ylabel("Ellipsoid Height [m]")
-    ax2.xaxis.set_major_formatter(ticks_x)
-    # mpl.savefig('figs/' + str(dflst[dnum]['LINE'].values[0]) + '_forward_lineplot.png', bbox_inches='tight')
-    # mpl.suptitle(ptitle, y=0.98)
-    mpl.savefig(pname, bbox_inches='tight')   # save the figure to file
-    mpl.close(fig)
-    return
-
-
 def oib_mapplot(lon, lat, field, units='', ptitle='test_map', pfile='test_map'):
     import matplotlib.pyplot as plt
     import cartopy.crs as ccrs
@@ -373,5 +380,50 @@ def oib_mapplot_hilite(lon, lat, field, data, units='', ptitle='test_map', pfile
         plt.close()
     except IndexError:
         print "Couldn't make Map Plot."
+    return
+
+
+def talwani_lineplot(x, fag070, gz_adj, polygons, rmse, ptitle='test_talwaniplot', pname='test_talwaniplot'):
+    """
+    :param data:
+    :param ptitle:
+    :param pname:
+    :return:
+    """
+    from fatiando.vis import mpl
+    import matplotlib.ticker as ticker
+    # import matplotlib.pyplot as plt
+
+
+    fig = mpl.figure(num=None, figsize=(8, 5), dpi=80, facecolor='w', edgecolor='k')
+    mpl.axis('scaled')
+    ax1 = mpl.subplot(2, 1, 1)
+    mpl.title(ptitle)
+    mpl.plot(x, gz_adj, '-r', linewidth=2, label='Modeled (constant)')
+    # mpl.plot(x, gz-fag070, '-b', linewidth=1)
+    mpl.plot(x, fag070, color='k', linestyle="None", marker=',', label='FAG070')
+    mpl.xlim(min(x), max(x))
+    ticks_x = ticker.FuncFormatter(lambda x, pos: '{0:g}'.format(x / 1e3))
+    ax1.xaxis.set_major_formatter(ticks_x)
+    mpl.ylabel("mGal")
+    mpl.legend()
+    # ax1.annotate('rmse: '+str(int(rmse))+' mGal',
+    #              xy=(min(x)*1.1, np.mean(gz)*1.1), xytext=(min(x)*1.1, np.mean(gz)*1.1))
+    if not np.isnan(rmse):
+        ax1.annotate('rmse: ' + str(int(rmse)) + ' mGal',
+                     xy=(x[2], np.mean(gz_adj)), xytext=(x[2], np.mean(gz_adj)))
+    ###
+    ax2 = mpl.subplot(2, 1, 2)
+    mpl.polygon(polygons[0], '.-k', linewidth=1, fill='cyan', alpha=0.5)
+    mpl.polygon(polygons[1], '.-k', linewidth=1, fill='orange', alpha=0.5)
+    mpl.xlim(min(x), max(x))
+    mpl.ylim(-1600, 2000)
+    mpl.xlabel("Distance [km]")
+    mpl.ylabel("Ellipsoid Height [m]")
+    ax2.xaxis.set_major_formatter(ticks_x)
+    # mpl.savefig('figs/' + str(dflst[dnum]['LINE'].values[0]) + '_forward_lineplot.png', bbox_inches='tight')
+    # mpl.suptitle(ptitle, y=0.98)
+    mpl.savefig(pname, bbox_inches='tight')   # save the figure to file
+    mpl.close(fig)
     return
 
