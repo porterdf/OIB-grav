@@ -10,7 +10,7 @@ from fatiando.mesher import Polygon
 
 from my_OIB_functions import *
 
-def forward_oib(infile, make_plots=False):
+def forward_oib(basedir, infile, make_plots=False):
     # -*- coding: utf-8 -*-
     # %load_ext autoreload
     # %autoreload 2
@@ -187,14 +187,17 @@ def forward_oib(infile, make_plots=False):
     '''
     Save to CSV
     '''
-    df2.to_csv('data/forward/OIB_ANT_'+str(df2['DATE'].values[0])[:10]+'_forward.csv')
+    outdir = os.path.join(basedir, 'integrated', 'forward')
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
+    df2.to_csv(os.path.join(outdir, 'OIB_'+str(df2['DATE'].values[0])[:10]+'_forward.csv'))
 
 if __name__ == '__main__':
-    basedir = 'data'
-    datadir = 'agg2invert'
+    basedir = '/Users/dporter/Documents/data_local/Greenland/OIB/'
+    datadir = 'integrated'
     suffix = '.csv'
     ### Run through each directory
-    pattern = os.path.join(basedir, datadir, 'OIB_ANT_*' + suffix)
+    pattern = os.path.join(basedir, datadir, 'OIB_*' + suffix)
     # pattern = './data/NetCDF/10103/R10103_003*.nc'
     filenames = sorted(glob(pattern))  # , key=alphanum_key)
     filecounter = len(filenames)
@@ -202,7 +205,7 @@ if __name__ == '__main__':
         print "Data file %i is %s" % (fnum, filename)
         # sys.exit(main(timedir))
         try:
-            forward_oib(filename, True)
+            forward_oib(basedir, filename, True)
         except IOError:
             print 'IOError - Data Not Found'
         except AttributeError:

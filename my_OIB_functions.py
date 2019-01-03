@@ -4,8 +4,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import pandas as pd
+import matplotlib.dates as mdates
 # import seaborn as sns
 # from datetime import datetime, date, time
+
+
 
 def alphanum_key(s):
     import re
@@ -30,13 +33,49 @@ def haversine(origin, destination):
     return d
 
 
-def catATM(basedir, timedir):
+def fill_nan(a):
+    from scipy import interpolate
+    import numpy.ma as ma
+    import numpy as np
+
+    '''
+    interpolate to fill nan values
+    '''
+    b = ma.filled(a, np.nan)
+    inds = np.arange(b.shape[0])
+    good = np.where(np.isfinite(b))
+    f = interpolate.interp1d(inds[good], b[good], bounds_error=False)
+    c = np.where(np.isfinite(b), b, f(inds))
+    return c
+
+
+def linearly_interpolate_nans(y):
+    import numpy as np
+    # Fit a linear regression to the non-nan y values
+
+    # Create X matrix for linreg with an intercept and an index
+    X = np.vstack((np.ones(len(y)), np.arange(len(y))))
+
+    # Get the non-NaN values of X and y
+    X_fit = X[:, ~np.isnan(y)]
+    y_fit = y[~np.isnan(y)].reshape(-1, 1)
+
+    # Estimate the coefficients of the linear regression
+    beta = np.linalg.lstsq(X_fit.T, y_fit)[0]
+
+    # Fill in all the nan values using the predicted coefficients
+    y.flat[np.isnan(y)] = np.dot(X[:, np.isnan(y)].T, beta)
+    return y
+
+
+def catATM(atmdir, date_flight):
     datadir = 'ILATM2'
     # infile = '2009_AN_NASA_ATM_all'
     suffix = '.csv'
     import sys, glob, time
-    # Get icessn filenames that were passed as arguments
-    pattern = os.path.join(basedir, datadir, timedir, '*_smooth_*' + suffix)
+    # Get icessn filenames that were passed as arguments TODO use dates to grab only certain files
+    pattern = os.path.join(atmdir, 'ILATM2_' + date_flight + '*_smooth_*' + suffix)
+    print('ATM pattern: {}'.format(pattern))
     try:
         # filenames = [f for f in infiles if f.__contains__('_smooth_') if f.endswith('_50pt.csv')]
         filenames = sorted(glob.glob(pattern))  # , key=alphanum_key)
@@ -45,13 +84,14 @@ def catATM(basedir, timedir):
     except:
         print __doc__
     # exit()
-    output_filename = os.path.join(basedir, datadir, timedir, 'ILATM2_' + timedir + '_all' + suffix)
+    output_filename = os.path.join(atmdir, 'ILATM2_' + date_flight + '_all' + suffix)
+    print('Extracting records TO {0}'.format(output_filename))
     tiles = [0]
     # Open output file
     with open(output_filename, 'w') as f:
         # Loop through filenames
         for filename in filenames:
-            # 		print 'Extracting records from {0}...'.format(filename)
+            print('Extracting records from {0}...'.format(filename))
             # Get date from filename
             # date = '20' + filename[:6]	# this is Linky's original code
             date = os.path.basename(filename)[7:15]
@@ -103,6 +143,47 @@ def calc_surface(atm, radar):
     return surface
 
 
+def get_closest_ANTGG_cell(file_for_latlon, lat, lon):
+    """
+    SSIA
+    :param file_for_latlon:
+    :param lat:
+    :param lon:
+    :return:
+    """
+    LAT = file_for_latlon['latitude'][:]
+    LON = file_for_latlon['longitude'][:]
+#     print(lat,lon)
+    a = abs(LON - lon) + abs(LAT - lat)
+    iii, jjj = np.unravel_index(a.argmin(), a.shape)
+    return iii, jjj
+
+
+def get_closest_ADMAP_cell(file_for_latlon, lat, lon):
+    """
+    SSIA
+    :param file_for_latlon:
+    :param lat:
+    :param lon:
+    :return:
+    """
+    LAT = file_for_latlon['lat'][:]
+    LON = file_for_latlon['lon'][:]
+    #     print('lat,lon', lat,lon)
+    #     a = abs(LON - lon)
+    #     print(a.min())
+    #     print('Closest lat,lon', LAT[a.argmin()], LON[a.argmin()])
+
+    #     a = abs(LAT - lat)
+    #     print(a.min())
+    #     print('Closest lat,lon', LAT[a.argmin()], LON[a.argmin()])
+
+    a = abs(LON - lon) + abs(LAT - lat)
+    #     print(a.min())
+    #     print('Closest lat,lon', LAT[a.argmin()], LON[a.argmin()])
+    return a.argmin()
+
+
 def importOIBrad(basedir, timedir, infile):
     """
     :param basedir:
@@ -132,23 +213,25 @@ def importOIBrad(basedir, timedir, infile):
     return df
 
 
-def importOIBrad_all(basedir, timedir):
+def importOIBrad_all(raddir, date_flight):
     """
     :param basedir:
     :param timedir:
     :return:
     """
     from glob import glob
-    basedir = '/Users/dporter/Documents/data_local/Antarctica/OIB/'
-    datadir = 'IRMCR2'
+    # basedir = '/Users/dporter/Documents/data_local/OIB/OIB/'
+    # datadir = 'IRMCR2'
     # infile = '2009_Antarctica_DC8'
     suffix = '.csv'
-    pattern = os.path.join(basedir, datadir, timedir, 'IRMCR2_*' + suffix)
+    pattern = os.path.join(raddir, '**', '*'+date_flight+'*' + suffix)
+    print(pattern)
     filenames = sorted(glob(pattern))  # , key=alphanum_key)
+    print(filenames)
     filecounter = len(filenames)
     df_all = {}
     for fnum, filename in enumerate(filenames, start=0):
-        print "Data file %i is %s" % (fnum, filename)
+        # print "RADAR data file %i is %s" % (fnum, filename)
         df = pd.read_csv(filename, delimiter=",", na_values='-9999.00')
         df.rename(columns={'SURFACE': 'SURFACE_radar'}, inplace=True)
 
@@ -158,7 +241,7 @@ def importOIBrad_all(basedir, timedir):
         df['DATE'] = pd.to_datetime(list(df.FRAMESTR.str[:8]), format='%Y%m%d')
         del df['FRAMESTR']
         df['UNIX'] = df['DATE'].astype(np.int64) // 10 ** 9
-        df['UNIX'] = df['UNIX'] + df['TIME']
+        df['UNIX'] = df['UNIX'] + df['UTCTIMESOD']
         df['iunix'] = pd.to_datetime(df['UNIX'] * 10 ** 3, unit='ms')
         df = df.set_index('iunix')
         if fnum == 0:
@@ -168,13 +251,13 @@ def importOIBrad_all(basedir, timedir):
     return df_all
 
 
-def importOIBatm(basedir, timedir):
+def importOIBatm(atmdir, date_flight):
     """
     :param basedir:
     :param timedir:
     :return:
     """
-    datadir = 'ILATM2'
+    # datadir = 'ILATM2'
     infile = 'ILATM2_'
     suffix = '.csv'
 
@@ -182,7 +265,7 @@ def importOIBatm(basedir, timedir):
     headers = (
         'DATE', 'TIME', 'LAT', 'LON', 'SURFACE_atm', 'SLOPESN', 'SLOPEWE', 'RMS', 'NUMUSED', 'NUMOMIT', 'DISTRIGHT',
         'TRACKID')
-    df = pd.read_csv(os.path.join(basedir, datadir, timedir, infile + timedir + '_all' + suffix),
+    df = pd.read_csv(os.path.join(atmdir, infile + date_flight + '_all' + suffix),
                      header=None)  # delimiter=r"\s+",
     df.rename(columns=dict(zip(df.columns, headers)), inplace=True)
     # del df['TIME2']
@@ -197,7 +280,7 @@ def importOIBatm(basedir, timedir):
     return df
 
 
-def importOIBgrav(basedir, timedir):
+def importOIBgrav(gravdir, timedir, date_flight):
     """
     :param basedir:
     :param timedir:
@@ -209,9 +292,9 @@ def importOIBgrav(basedir, timedir):
     # infile = 'IGGRV1B_20091031_11020500_V016'
     # infile = 'IGGRV1B_20091116_15124500_V016'
     suffix = '.txt'
-    pattern = os.path.join(basedir, timedir, 'IGGRV1B_*' + suffix)
+    pattern = os.path.join(gravdir, timedir, 'IGGRV1B_'+date_flight+'*' + suffix)
+    print(pattern)
     infile = sorted(glob(pattern))  # , key=alphanum_key)
-    print infile
 
     ### Read ascii file as csv
     # metadata ends on line 69, column names on line 70
@@ -294,7 +377,7 @@ def mapplotOIBlocal(x, y, z, title, units, range, colormap):
     return
 
 
-def oib_lineplot(data, ptitle='test_lineplot', pname='test_lineplot'):
+def oib_lineplot_original(data, ptitle='test_lineplot', pname='test_lineplot'):
     """
     :param data:
     :param ptitle:
@@ -318,15 +401,57 @@ def oib_lineplot(data, ptitle='test_lineplot', pname='test_lineplot'):
     return
 
 
+def oib_lineplot_derived(df, starttime, endtime, ptitle='test_lineplot', pname='test_lineplot'):
+    """
+
+    :param df:
+    :param starttime:
+    :param endtime:
+    :param pname:
+    :return:
+    """
+    fig, axes = plt.subplots(nrows=4, ncols=1, figsize=(12, 8), sharex=True)
+    # ax = fig.add_subplot(111)
+    ln1 = axes[0].plot(df[['FAG070']].resample('10S').mean(), label='FAG$_{070}$', c='black')
+    ln2 = axes[0].plot(df[['FAG140']].resample('10S').mean(), label='FAG$_{140}$', c='red')
+    ln3 = axes[1].plot(df[['FX']].resample('S').mean(), marker=',', label='FX', c='grey')
+    ln4 = axes[2].plot(df[['surface_recalc']].resample('S').mean(), label='SFC$_{recalc}$', c='cyan', lw=2.5)
+    ln5 = axes[2].plot(df[['icebase_recalc']].resample('S').mean(), label='ICEBASE$_{recalc}$', c='blue', lw=2.5)
+    ln5 = axes[2].plot(df[['TOPOGRAPHY_radar']].resample('S').mean(), marker=',', label='TOPO$_{radar}$', c='green', lw=0.5)
+    ln52 = axes[2].plot(df[['SURFACE_atm']].resample('S').mean(), marker='+', label='SFC$_{atm}$', c='black', lw=0.5)
+    ln6 = axes[2].plot(df[['WGSHGT']].resample('S').mean(), ls='dotted', label='Survey Height', c='black', lw=0.5)
+    ln7 = axes[2].plot(df[['HYDROAPPX']].resample('S').mean(), label='Hydrostatic Appx', c='grey', lw=0.5)
+    ln8 = axes[3].plot(df[['THICK']].resample('S').mean(), label='THICK', c='black')
+    try:
+        lnS1 = axes[0].plot(df[['free_air_anomaly']].resample('10S').mean(), label='FAA$_{ANTGG}$', c='purple')
+    except KeyError:
+        print('No ANTGG')
+    axes[0].set_ylabel('mGal')
+    axes[0].legend(loc="lower left")
+    axes[1].set_ylabel('mGal')
+    axes[1].legend(loc="lower right")
+    axes[2].set_ylim([-1000, 1800])
+    axes[2].set_ylabel('m.a.s.l.')
+    axes[2].legend(ncol=6)
+    plt.xlim(starttime, endtime)
+    fig.autofmt_xdate()
+    axes[2].xaxis.set_major_formatter(mdates.DateFormatter('%d-%b %H%Mz'))
+    plt.suptitle(ptitle, y=0.95)
+    plt.tight_layout()
+    plt.savefig(pname, bbox_inches='tight')
+    plt.close(fig)
+
+
 def oib_mapplot(lon, lat, field, units='', ptitle='test_map', pfile='test_map'):
     import matplotlib.pyplot as plt
     import cartopy.crs as ccrs
     # from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
     # import cartopy.feature
     try:
-        ax = plt.axes(projection=ccrs.PlateCarree())
+        ax = plt.axes(figsize=(12, 8), projection=ccrs.PlateCarree())
         plt.scatter(lon, lat, c=field, cmap=cm.jet, s=10, transform=ccrs.PlateCarree())
         # ax.set_extent([-50, -80, -80, -60])
+        ax.set_extent([lon.min()+360-2, lon.max()+360+2, lat.min()-2, lat.max()+2], crs=ccrs.PlateCarree())
         ax.coastlines(resolution='10m')
         # ax.add_feature(cartopy.feature.LAND)
         # ax.add_feature(cartopy.feature.OCEAN)
