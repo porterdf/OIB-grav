@@ -13,7 +13,7 @@ import matplotlib.dates as mdates
 def alphanum_key(s):
     import re
     key = re.split(r"(\d+)", s)
-    key[1::2] = map(int, key[1::2])
+    key[1::2] = list(map(int, key[1::2]))
     return key
 
 
@@ -75,23 +75,23 @@ def catATM(atmdir, date_flight):
     import sys, glob, time
     # Get icessn filenames that were passed as arguments TODO use dates to grab only certain files
     pattern = os.path.join(atmdir, 'ILATM2_' + date_flight + '*_smooth_*' + suffix)
-    print('ATM pattern: {}'.format(pattern))
+    print(('ATM pattern: {}'.format(pattern)))
     try:
         # filenames = [f for f in infiles if f.__contains__('_smooth_') if f.endswith('_50pt.csv')]
         filenames = sorted(glob.glob(pattern))  # , key=alphanum_key)
         # filenames[0]
-        print 'Extracting records from {0}...'.format(filenames[0])
+        print('Extracting records from {0}...'.format(filenames[0]))
     except:
-        print __doc__
+        print(__doc__)
     # exit()
     output_filename = os.path.join(atmdir, 'ILATM2_' + date_flight + '_all' + suffix)
-    print('Extracting records TO {0}'.format(output_filename))
+    print(('Extracting records TO {0}'.format(output_filename)))
     tiles = [0]
     # Open output file
     with open(output_filename, 'w') as f:
         # Loop through filenames
         for filename in filenames:
-            print('Extracting records from {0}...'.format(filename))
+            print(('Extracting records from {0}...'.format(filename)))
             # Get date from filename
             # date = '20' + filename[:6]	# this is Linky's original code
             date = os.path.basename(filename)[7:15]
@@ -143,7 +143,7 @@ def calc_surface(atm, radar):
     return surface
 
 
-def get_closest_ANTGG_cell(file_for_latlon, lat, lon):
+def get_closest_cell_xr(ds, lat, lon, lat_key='lat', lon_key='lon'):
     """
     SSIA
     :param file_for_latlon:
@@ -151,37 +151,34 @@ def get_closest_ANTGG_cell(file_for_latlon, lat, lon):
     :param lon:
     :return:
     """
-    LAT = file_for_latlon['latitude'][:]
-    LON = file_for_latlon['longitude'][:]
-#     print(lat,lon)
-    a = abs(LON - lon) + abs(LAT - lat)
+    a = abs(ds[lon_key][:] - lon) + abs(ds[lat_key][:] - lat)
     iii, jjj = np.unravel_index(a.argmin(), a.shape)
     return iii, jjj
 
 
-def get_closest_ADMAP_cell(file_for_latlon, lat, lon):
+def get_closest_cell_llz(df_llz, lat, lon, lat_key='lat', lon_key='lon'):
     """
     SSIA
-    :param file_for_latlon:
+    :param df_llz:
     :param lat:
     :param lon:
     :return:
     """
-    LAT = file_for_latlon['lat'][:]
-    LON = file_for_latlon['lon'][:]
+    lat_llz = df_llz[lat_key][:]
+    lon_llz = df_llz[lon_key][:]
     #     print('lat,lon', lat,lon)
     #     a = abs(LON - lon)
     #     print(a.min())
-    #     print('Closest lat,lon', LAT[a.argmin()], LON[a.argmin()])
+    #     print('Closest lat,lon', LAT[a.idxmin()], LON[a.idxmin()])
 
     #     a = abs(LAT - lat)
     #     print(a.min())
-    #     print('Closest lat,lon', LAT[a.argmin()], LON[a.argmin()])
+    #     print('Closest lat,lon', LAT[a.idxmin()], LON[a.idxmin()])
 
-    a = abs(LON - lon) + abs(LAT - lat)
+    a = abs(lon_llz - lon) + abs(lat_llz - lat)
     #     print(a.min())
-    #     print('Closest lat,lon', LAT[a.argmin()], LON[a.argmin()])
-    return a.argmin()
+    #     print('Closest lat,lon', LAT[a.idxmin()], LON[a.idxmin()])
+    return a.idxmin()
 
 
 def importOIBrad(basedir, timedir, infile):
@@ -224,7 +221,7 @@ def importOIBrad_all(raddir, date_flight):
     # datadir = 'IRMCR2'
     # infile = '2009_Antarctica_DC8'
     suffix = '.csv'
-    pattern = os.path.join(raddir, '**', '*'+date_flight+'*' + suffix)
+    pattern = os.path.join(raddir, '*'+date_flight+'*' + suffix)
     print(pattern)
     filenames = sorted(glob(pattern))  # , key=alphanum_key)
     print(filenames)
@@ -241,7 +238,10 @@ def importOIBrad_all(raddir, date_flight):
         df['DATE'] = pd.to_datetime(list(df.FRAMESTR.str[:8]), format='%Y%m%d')
         del df['FRAMESTR']
         df['UNIX'] = df['DATE'].astype(np.int64) // 10 ** 9
-        df['UNIX'] = df['UNIX'] + df['UTCTIMESOD']
+        try:
+            df['UNIX'] = df['UNIX'] + df['TIME']  # df['UTCTIMESOD']
+        except KeyError:
+            df['UNIX'] = df['UNIX'] + df['UTCTIMESOD']  # TODO: columns changed after 2016
         df['iunix'] = pd.to_datetime(df['UNIX'] * 10 ** 3, unit='ms')
         df = df.set_index('iunix')
         if fnum == 0:
@@ -267,7 +267,7 @@ def importOIBatm(atmdir, date_flight):
         'TRACKID')
     df = pd.read_csv(os.path.join(atmdir, infile + date_flight + '_all' + suffix),
                      header=None)  # delimiter=r"\s+",
-    df.rename(columns=dict(zip(df.columns, headers)), inplace=True)
+    df.rename(columns=dict(list(zip(df.columns, headers))), inplace=True)
     # del df['TIME2']
 
     ### do some DATETIME operations
@@ -293,7 +293,7 @@ def importOIBgrav(gravdir, timedir, date_flight):
     # infile = 'IGGRV1B_20091116_15124500_V016'
     suffix = '.txt'
     pattern = os.path.join(gravdir, timedir, 'IGGRV1B_'+date_flight+'*' + suffix)
-    print(pattern)
+    print(('gravity file pattern: {}'.format(pattern)))
     infile = sorted(glob(pattern))  # , key=alphanum_key)
 
     ### Read ascii file as csv
@@ -303,7 +303,7 @@ def importOIBgrav(gravdir, timedir, date_flight):
         'INTCOR',
         'FAG070', 'FAG100', 'FAG140', 'FLTENVIRO')
     # print "Reading gravity file: %s" % infile[0] + suffix %TODO why did I think this would be a list?
-    print "Reading gravity file: %s" % infile[0] + suffix
+    print("Reading gravity file: %s" % infile[0] + suffix)
     df = pd.read_csv(infile[0], delimiter=r"\s+", header=None, names=headers, skiprows=70)
     # headers = df.columns[1:df.shape[1]]
     # df.rename(columns=dict(zip(df.columns,headers)), inplace=True)
@@ -377,26 +377,57 @@ def mapplotOIBlocal(x, y, z, title, units, range, colormap):
     return
 
 
-def oib_lineplot_original(data, ptitle='test_lineplot', pname='test_lineplot'):
+def oib_lineplot_all(data, ptitle='test_lineplot', pname='test_lineplot'):
     """
     :param data:
     :param ptitle:
     :param pname:
     :return:
     """
+    plotmax = np.nanmax([np.nanmax(data['surface_recalc'])+1000, 200])
+    plotmin = np.nanmin([-200, np.nanmin(data['icebase_recalc']) - 300])
     import matplotlib.pyplot as plt
     data.loc[data['HYDROAPPX'] < -1500, 'HYDROAPPX'] = np.nan
-    fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(12, 8))
-    data['FAG070'].where((data['FLTENVIRO'] == 1)).plot(ax=axes[0], legend=True, label='Disturbed', style='r-')
-    data['FAG070'].where((data['FLTENVIRO'] == 0)).plot(ax=axes[0], legend=True, label='Normal', style='k-')
+    fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(8, 6),
+                             gridspec_kw={"height_ratios":[2,1,3]})
+    # Panel 1
+    data['FAG070'].where((data['FLTENVIRO'] == 1)).plot(ax=axes[0], legend=True, label='FAG070', style='r+')
+    data['FAG070'].where((data['FLTENVIRO'] == 0)).plot(ax=axes[0], legend=True, label='FAG070', style='k+')
+    try:
+        data['FAA'].plot(ax=axes[0], legend=True, label='ANTGG', style='-b,')
+    except KeyError:
+        print('No FAA to plot')
+    plt.tick_params(labelbottom=False)
     # data['FAG070'].where((data['FLTENVIRO'] == -1)).plot(ax=axes[0], legend=True, label='Missing', style='b-')
-    data['ELEVATION'].plot(ax=axes[1], legend=True, style='y.')
-    data['TOPOGRAPHY_radar'].plot(ax=axes[1], legend=True, marker=".", color='blue')
-    data['HYDROAPPX'].plot(ax=axes[1], legend=True, color='grey')
-    data['SURFACE_atm'].where((data['NUMUSED'] > 77)).plot(ax=axes[1], legend=True, color='cyan')
-    data['ICEBASE'].plot(ax=axes[1], legend=True, color='brown')
+    # Panel 2
+    try:
+        data['ADMAP'].plot(ax=axes[1], legend=True, label='ADMAP', style='r-')
+    except KeyError:
+        print('No FAA to plot')
+    # Panel 3
+    data['WGSHGT'].plot(ax=axes[2], legend=True, style='y-')
+    data['SURFACE_atm'].where((data['NUMUSED'] > 77)).plot(ax=axes[2], legend=True, color='cyan')
+    data['surface_recalc'].plot(ax=axes[2], legend=True, marker=".", color='blue')
+    data['icebase_recalc'].plot(ax=axes[2], legend=True, color='brown')
+    try:
+        data['RTOPO2_bedrock'].plot(ax=axes[2], legend=True, label='RTOPO2', color='black')
+    except KeyError:
+        print('No RTOPO2 to plot')
+    data['HYDROAPPX'].plot(ax=axes[2], legend=True, color='grey')
+    axes[1].tick_params(labelbottom=False)
+    axes[2].set_ylim([plotmin, plotmax])
+    # axes[0].tick_params(
+    #     axis='x',  # changes apply to the x-axis
+    #     which='both',  # both major and minor ticks are affected
+    #     bottom=False,  # ticks along the bottom edge are off
+    #     top=False,  # ticks along the top edge are off
+    #     labelbottom=False)  # labels along the bottom edge are off
+    # axes[2].legend(loc = 'upper center', bbox_to_anchor = (0.5, 0.95),
+    #                fancybox = True, shadow = True, ncol = 5)
+    lgd = axes[2].legend(bbox_to_anchor=(0.50, -0.05), loc="lower center",
+                    bbox_transform=fig.transFigure, ncol=3)
     plt.suptitle(ptitle, y=0.98)
-    plt.savefig(pname, bbox_inches='tight')   # save the figure to file
+    plt.savefig(pname, bbox_extra_artists=(lgd,), bbox_inches='tight')   # save the figure to file
     plt.close(fig)
     return
 
@@ -442,14 +473,14 @@ def oib_lineplot_derived(df, starttime, endtime, ptitle='test_lineplot', pname='
     plt.close(fig)
 
 
-def oib_mapplot(lon, lat, field, units='', ptitle='test_map', pfile='test_map'):
+def oib_mapplot_flight(lon, lat, field, units='', ptitle='test_map', pfile='test_map'):
     import matplotlib.pyplot as plt
     import cartopy.crs as ccrs
     # from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
     # import cartopy.feature
     try:
-        ax = plt.axes(figsize=(12, 8), projection=ccrs.PlateCarree())
-        plt.scatter(lon, lat, c=field, cmap=cm.jet, s=10, transform=ccrs.PlateCarree())
+        ax = plt.axes(projection=ccrs.PlateCarree())  #figsize=(12, 8),
+        plt.scatter(lon, lat, c=field, cmap=cm.jet, s=2, transform=ccrs.PlateCarree())
         # ax.set_extent([-50, -80, -80, -60])
         ax.set_extent([lon.min()+360-2, lon.max()+360+2, lat.min()-2, lat.max()+2], crs=ccrs.PlateCarree())
         ax.coastlines(resolution='10m')
@@ -470,7 +501,7 @@ def oib_mapplot(lon, lat, field, units='', ptitle='test_map', pfile='test_map'):
         # plt.show()
         plt.close()
     except IndexError:
-        print "Couldn't make Map Plot."
+        print("Couldn't make Map Plot.")
     return
 
 
@@ -504,51 +535,93 @@ def oib_mapplot_hilite(lon, lat, field, data, units='', ptitle='test_map', pfile
         # plt.show()
         plt.close()
     except IndexError:
-        print "Couldn't make Map Plot."
+        print("Couldn't make Map Plot.")
+    return
+
+def oib_mapplot_zoom(lon, lat, field, units='', ptitle='test_map', pfile='test_map'):
+    import matplotlib.pyplot as plt
+    import cartopy.crs as ccrs
+    from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+    import cartopy.feature
+    import shapely.geometry as sgeom
+    try:
+        # box = sgeom.box(minx=0, maxx=360, miny=-88, maxy=-56)
+        # x0, y0, x1, y1 = box.bounds
+        myproj = ccrs.SouthPolarStereo(central_longitude=180)
+
+        plt.figure(figsize=(8, 4), facecolor='white', dpi=144)
+        ax = plt.axes(projection=myproj)
+
+        #         plt.scatter(data['LONG'], data['LAT'], c='black', s=1, transform=ccrs.PlateCarree())
+        plt.scatter(lon, lat, c=field, cmap=cm.jet, s=15, transform=ccrs.PlateCarree())
+        c = plt.colorbar(orientation='vertical', shrink=0.4, pad=0.10)
+        c.ax.set_yticklabels(c.ax.get_yticklabels(), rotation=0)
+        c.set_label(units)
+        # transform = ccrs.PlateCarree()._as_mpl_transform(ax)
+        # for i, txt in enumerate(field):
+        #     # print '%s: %s, %s' % (txt, lon[i], lat[i])
+        #     ax.annotate(txt, (lon[i], lat[i]), xycoords=transform,
+        #                 ha='right', va='top')
+
+        ax.coastlines(resolution='50m')
+        # ax.add_feature(cartopy.feature.LAND)
+        # ax.add_feature(cartopy.feature.OCEAN)
+        # ax.gridlines(draw_labels=False, alpha=0.3, color='grey')
+        # ax.xformatter = LONGITUDE_FORMATTER
+        # ax.yformatter = LATITUDE_FORMATTER
+        # ax.set_extent([x0, x1, y0, y1], ccrs.PlateCarree())
+
+        plt.tight_layout()
+        plt.subplots_adjust(top=1.25)
+        plt.suptitle(ptitle, y=0.98)
+        plt.savefig(pfile, bbox_inches='tight')  # save the figure to file
+        # plt.show()
+        # plt.close()
+    except IndexError:
+        print("Couldn't make Map Plot.")
     return
 
 
-def talwani_lineplot(x, fag070, gz_adj, polygons, rmse, ptitle='test_talwaniplot', pname='test_talwaniplot'):
-    """
-    :param data:
-    :param ptitle:
-    :param pname:
-    :return:
-    """
-    from fatiando.vis import mpl
+def talwani_lineplot(x, fag070, gz_adj, polygons, rmse, pmin=-2000, pmax=2000,
+                     ptitle='test_talwaniplot', pname='test_talwaniplot'):
+
+    # from fatiando.vis import mpl
     import matplotlib.ticker as ticker
-    # import matplotlib.pyplot as plt
+    import matplotlib.pyplot as plt
 
 
-    fig = mpl.figure(num=None, figsize=(8, 5), dpi=80, facecolor='w', edgecolor='k')
-    mpl.axis('scaled')
-    ax1 = mpl.subplot(2, 1, 1)
-    mpl.title(ptitle)
-    mpl.plot(x, gz_adj, '-r', linewidth=2, label='Modeled (constant)')
-    # mpl.plot(x, gz-fag070, '-b', linewidth=1)
-    mpl.plot(x, fag070, color='k', linestyle="None", marker=',', label='FAG070')
-    mpl.xlim(min(x), max(x))
+    fig = plt.figure(num=None, figsize=(8, 5), dpi=80, facecolor='w', edgecolor='k')
+    plt.axis('scaled')
+    ax1 = plt.subplot(2, 1, 1)
+    plt.title(ptitle)
+    plt.plot(x, gz_adj, '-r', linewidth=0.7, label='Modeled (WGSHGT)', zorder=1)
+    # plt.plot(x, gz-fag070, '-b', linewidth=1)
+    plt.plot(x, fag070, color='k', linestyle="None", marker='.', label='FAG070', zorder=0)
+    plt.xlim(min(x), max(x))
     ticks_x = ticker.FuncFormatter(lambda x, pos: '{0:g}'.format(x / 1e3))
     ax1.xaxis.set_major_formatter(ticks_x)
-    mpl.ylabel("mGal")
-    mpl.legend()
+    plt.ylabel("mGal")
+    plt.legend()
     # ax1.annotate('rmse: '+str(int(rmse))+' mGal',
     #              xy=(min(x)*1.1, np.mean(gz)*1.1), xytext=(min(x)*1.1, np.mean(gz)*1.1))
     if not np.isnan(rmse):
         ax1.annotate('rmse: ' + str(int(rmse)) + ' mGal',
                      xy=(x[2], np.mean(gz_adj)), xytext=(x[2], np.mean(gz_adj)))
     ###
-    ax2 = mpl.subplot(2, 1, 2)
-    mpl.polygon(polygons[0], '.-k', linewidth=1, fill='cyan', alpha=0.5)
-    mpl.polygon(polygons[1], '.-k', linewidth=1, fill='orange', alpha=0.5)
-    mpl.xlim(min(x), max(x))
-    mpl.ylim(-1600, 2000)
-    mpl.xlabel("Distance [km]")
-    mpl.ylabel("Ellipsoid Height [m]")
+    ax2 = plt.subplot(2, 1, 2)
+    ax2.fill(polygons[0].vertices[:, 0], polygons[0].vertices[:, 1], edgecolor='black', linewidth=1, alpha=0.5,
+             color='cyan')
+    ax2.fill(polygons[1].vertices[:, 0], polygons[1].vertices[:, 1], edgecolor='black', linewidth=1, alpha=0.5,
+             color='blue')
+    ax2.fill(polygons[2].vertices[:, 0], polygons[2].vertices[:, 1], edgecolor='black', linewidth=1, alpha=0.5,
+             color='orange')
+    plt.xlim(min(x), max(x))
+    plt.ylim(pmin, pmax)
+    plt.xlabel("Distance [km]")
+    plt.ylabel("Ellipsoid Height [m]")
     ax2.xaxis.set_major_formatter(ticks_x)
     # mpl.savefig('figs/' + str(dflst[dnum]['LINE'].values[0]) + '_forward_lineplot.png', bbox_inches='tight')
     # mpl.suptitle(ptitle, y=0.98)
-    mpl.savefig(pname, bbox_inches='tight')   # save the figure to file
-    mpl.close(fig)
+    plt.savefig(pname, bbox_inches='tight')   # save the figure to file
+    plt.close(fig)
     return
-
