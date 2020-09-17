@@ -5,3 +5,5 @@
 .ipynb_checkpoints
 */.ipynb_checkpoints/*
 *.pickle
+*.pyc
+*.py.bak
