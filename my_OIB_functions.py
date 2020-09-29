@@ -69,10 +69,10 @@ def linearly_interpolate_nans(y):
 
 
 def catATM(atmdir, date_flight):
-    datadir = 'ILATM2'
-    # infile = '2009_AN_NASA_ATM_all'
-    suffix = '.csv'
     import sys, glob, time
+
+    suffix = '.csv'
+
     # Get icessn filenames that were passed as arguments TODO use dates to grab only certain files
     pattern = os.path.join(atmdir, 'ILATM2_' + date_flight + '*_smooth_*' + suffix)
     print(('ATM pattern: {}'.format(pattern)))
@@ -80,7 +80,7 @@ def catATM(atmdir, date_flight):
         # filenames = [f for f in infiles if f.__contains__('_smooth_') if f.endswith('_50pt.csv')]
         filenames = sorted(glob.glob(pattern))  # , key=alphanum_key)
         # filenames[0]
-        print('Extracting records from {0}...'.format(filenames[0]))
+        print('First up is {0}'.format(filenames[0]))
     except:
         print(__doc__)
     # exit()
@@ -91,7 +91,7 @@ def catATM(atmdir, date_flight):
     with open(output_filename, 'w') as f:
         # Loop through filenames
         for filename in filenames:
-            print(('Extracting records from {0}...'.format(filename)))
+            print(('Now extracting records from {0}...'.format(filename)))
             # Get date from filename
             # date = '20' + filename[:6]	# this is Linky's original code
             date = os.path.basename(filename)[7:15]
@@ -102,7 +102,7 @@ def catATM(atmdir, date_flight):
                 if (len(line.split()) == 11) and (int(line.split()[-1]) in tiles):
                     line = line.strip()
                     # gpsTime = float(line.split()[0])
-                    gpsTime = line.split()[0]
+                    gpsTime = float(line.split(',')[0])
                     # If seconds of day roll over to next day
                     if gpsTime < prevTime:
                         date = str(int(date) + 1)
@@ -222,10 +222,9 @@ def importOIBrad_all(raddir, date_flight):
     # infile = '2009_Antarctica_DC8'
     suffix = '.csv'
     pattern = os.path.join(raddir, '*'+date_flight+'*' + suffix)
-    print(pattern)
     filenames = sorted(glob(pattern))  # , key=alphanum_key)
-    print(filenames)
     filecounter = len(filenames)
+
     df_all = {}
     for fnum, filename in enumerate(filenames, start=0):
         # print "RADAR data file %i is %s" % (fnum, filename)
@@ -258,15 +257,15 @@ def importOIBatm(atmdir, date_flight):
     :return:
     """
     # datadir = 'ILATM2'
-    infile = 'ILATM2_'
+    prefix = 'ILATM2_'
     suffix = '.csv'
+    infile = os.path.join(atmdir, prefix + date_flight + '_all' + suffix)
 
     ### Read ascii file as csv
     headers = (
         'DATE', 'TIME', 'LAT', 'LON', 'SURFACE_atm', 'SLOPESN', 'SLOPEWE', 'RMS', 'NUMUSED', 'NUMOMIT', 'DISTRIGHT',
         'TRACKID')
-    df = pd.read_csv(os.path.join(atmdir, infile + date_flight + '_all' + suffix),
-                     header=None)  # delimiter=r"\s+",
+    df = pd.read_csv(infile, header=None)  # delimiter=r"\s+",
     df.rename(columns=dict(list(zip(df.columns, headers))), inplace=True)
     # del df['TIME2']
 
@@ -391,8 +390,8 @@ def oib_lineplot_all(data, ptitle='test_lineplot', pname='test_lineplot'):
     fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(8, 6),
                              gridspec_kw={"height_ratios":[2,1,3]})
     # Panel 1
-    data['FAG070'].where((data['FLTENVIRO'] == 1)).plot(ax=axes[0], legend=True, label='FAG070', style='r+')
-    data['FAG070'].where((data['FLTENVIRO'] == 0)).plot(ax=axes[0], legend=True, label='FAG070', style='k+')
+    data['FAG070'].where((data['FLTENVIRO'] == 1)).plot(ax=axes[0], legend=True, label='FLTENVIRO = 1', style='r+')
+    data['FAG070'].where((data['FLTENVIRO'] == 0)).plot(ax=axes[0], legend=True, label='FLTENVIRO = 0', style='k+')
     try:
         data['FAA'].plot(ax=axes[0], legend=True, label='ANTGG', style='-b,')
     except KeyError:
@@ -508,6 +507,7 @@ def oib_mapplot_flight(lon, lat, field, units='', ptitle='test_map', pfile='test
 def oib_mapplot_hilite(lon, lat, field, data, units='', ptitle='test_map', pfile='test_map'):
     # import matplotlib.pyplot as plt
     import cartopy.crs as ccrs
+    import matplotlib.cm as cm
     # from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
     # import cartopy.feature
     try:
@@ -521,7 +521,7 @@ def oib_mapplot_hilite(lon, lat, field, data, units='', ptitle='test_map', pfile
         # ax.add_feature(cartopy.feature.LAND)
         # ax.add_feature(cartopy.feature.OCEAN)
         ax.gridlines(draw_labels=True, alpha=0.3, color='grey')
-        ax.plot(lon[0], lat[0], 'bo', markersize=7, transform=ccrs.PlateCarree())
+        ax.plot(lon[0], lat[0], 'b+', markersize=7, transform=ccrs.PlateCarree())
         ax.xlabels_top = ax.ylabels_right = False
         # plt.xformatter = LONGITUDE_FORMATTER
         # ax.yformatter = LATITUDE_FORMATTER

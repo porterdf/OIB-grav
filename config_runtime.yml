@@ -1,0 +1,22 @@
+---
+
+  base_dir:  '/Users/dporter/data/OIB'
+  # base_dir:  '/Volumes/MyPassport2/Icebridge_Data/data'
+
+  grv_dir:   'IGGRV1B'
+  rad_dir:   'IRMCR2'
+  atm_dir:   'ILATM2'  
+  prc_dir:   'IPGG84'  
+
+  grd_dir: '/Users/dporter/data/OIB/grids'
+
+  out_dir:   '/Users/dporter/data/OIB'
+
+  # flight_list: ['2011.10.24', '2010.05.05']
+  # Venables
+  # flight_list: ['2009.10.28', '2011.11.16', '2012.10.25', '2014.11.05', '2017.11.16', '2017.11.25']
+  flight_list: ['2012.10.25', '2014.11.05', '2017.11.25']
+
+  sample_var: ['ADMAP', 'FAA', 'RTOPO2_icemask', 'RTOPO2_bedrock']
+  # sample_var: ['ADMAP', 'FAA', 'RTOPO2_bedrock']
+  # sample_var: ['ADMAP', 'FAA']

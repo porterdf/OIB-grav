@@ -1,7 +1,6 @@
-# -*- coding: future_fstrings -*-
-
 import sys
-# import os
+import os
+import re
 import time
 import yaml
 # import numpy as np
@@ -15,7 +14,7 @@ from fatiando.mesher import Polygon
 from my_OIB_functions import *
 
 
-def forward_oib(basedir, infile, dropturns=False, make_plots=False, diagnostics=False):
+def forward_oib(base_dir, infile, config, dropturns=False, make_plots=False, diagnostics=False):
     # type: (object, object, object, object) -> object
     # -*- coding: utf-8 -*-
     # %load_ext autoreload
@@ -27,16 +26,17 @@ def forward_oib(basedir, infile, dropturns=False, make_plots=False, diagnostics=
     pd.set_option('expand_frame_repr', False)
 
     '''
+    Config 
+    '''
+    prc_dir = config['prc_dir']
+    out_dir_base = config['out_dir']
+    out_dir = os.path.join(out_dir_base, prc_dir)
+
+    '''
     Read in file
     '''
-    # if os.path.isdir('/Volumes/C/'):
-    #     basedir = '/Volumes/C/data/Antarctic/OIB/ATM/2009_AN_NASA_ATM'
-    # else:
-    #     basedir = '/Volumes/BOOTCAMP/data/Antarctic/OIB/ATM/2009_AN_NASA_ATM'
-    # basedir = '/Users/dporter/Documents/data_local/Antarctica/OIB/'
-    # basedir = 'data'
-    outdir = os.path.join(basedir, 'integrated', 'forward')
-    df = pd.read_csv(infile)
+
+    df = pd.read_csv(os.path.join(base_dir, prc_dir, "IPGG84_" + infile.replace(".", "-") + ".csv"))
 
     '''
     Preliminary Processing
@@ -51,8 +51,12 @@ def forward_oib(basedir, infile, dropturns=False, make_plots=False, diagnostics=
 
     # TODO Add water block when HYDROAPPROX close to icebase_recalc OR use RTOPO icemask
 
+    '''
+    Make some directories now
+    '''
+    # out_dir = os.path.join(base_dir, 'integrated', 'forward')
     if make_plots:
-        pdir = os.path.join('figs', str(df['DATE'].values[0]))
+        pdir = os.path.join(out_dir, 'figs', str(df['DATE'].values[0]))
         if not os.path.exists(pdir):
             os.makedirs(pdir)
 
@@ -79,8 +83,6 @@ def forward_oib(basedir, infile, dropturns=False, make_plots=False, diagnostics=
         fag070 = dname['FAG070'][0:].values
         print('Distance of line is %i km' % (dist[-1] - dist[0]))
         if np.isfinite(fag070).any() and (dist[-1] - dist[0] < 5e2) and (dname['surface_recalc'].any()):
-            if diagnostics:
-                print('Processing the line.')
             '''
             Extract data from DataFrame
             '''
@@ -88,15 +90,28 @@ def forward_oib(basedir, infile, dropturns=False, make_plots=False, diagnostics=
             rho_w = 1005
             rho_r = 2670
 
-            ### Interpolate
+            ### Floating Ice
+            try:
+                dname['D_floatice'] = np.where(dname['RTOPO2_icemask'] == 2, 1, np.nan)
+            except KeyError:
+                dname['D_floatice'] = 1
+            if diagnostics:
+                dname[['RTOPO2_icemask', 'D_floatice']].plot();
+                plt.show()
+
+            # Set bed beneath floating ice to -2000 AKA 'bedcomp'
             if dname['icebase_recalc'].isnull().all():
                 print('No Icebase for this flight...')
-                dname['icebase_recalc'] = dname['surface_recalc'] - 1
+                dname['icebase_recalc'] = dname['RTOPO2_bedrock']
+                # or ... #
+                # dname['icebase_recalc'] = np.where((dname['D_floatice'] != 1),
+                #                               dname['RTOPO2_bedrock'],
+                #                               dname['HYDROAPPX'])
 
-            # if dname['surface_recalc'].all():
-            #     print('No surface for this flight...')
-
-            # TODO should these horizons be interpolated in previous script (read_OIB_ALL.py)?
+            if dname['surface_recalc'].all():
+                print('No surface for this flight...')
+            
+            ### Interpolate
             dname['ICESFC_horizon'] = dname['surface_recalc']
             dname['ICESFC_horizon'].interpolate(method='pad', inplace=True)
             dname['ICEBASE_horizon'] = dname['icebase_recalc']
@@ -104,6 +119,10 @@ def forward_oib(basedir, infile, dropturns=False, make_plots=False, diagnostics=
 
 
             # Find ice front position
+
+            # TODO is all this "is there a water block on either end?" necessary?  If so, can't we use RTOPO_icemask
+            # in a smarter way?
+
             firstmean = np.mean(dname['ICEBASE_horizon'].iloc[:5])  # or 'icebase_recalc', but this breaks when no bed
             lastmean = np.mean(dname['ICEBASE_horizon'].iloc[-5:])
             firsticepoint = dname['ICEBASE_horizon'].first_valid_index() - 1
@@ -127,7 +146,6 @@ def forward_oib(basedir, infile, dropturns=False, make_plots=False, diagnostics=
                 if diagnostics:
                     print('NO missing data at start of line.')
 
-            # Find ice front position
             # lastmean = np.mean(dname['icebase_recalc'].iloc[-5:])
             if np.isnan(lastmean):
                 if diagnostics:
@@ -167,13 +185,9 @@ def forward_oib(basedir, infile, dropturns=False, make_plots=False, diagnostics=
                 dname['WATERBASE_horizon'].loc[
                     lasticepoint - 1]
 
-            # if make_plots:
-            #     pdir = os.path.join('figs', str(dname['DATE'].values[0]))
-            #     print(pdir)
-            #     if not os.path.exists(pdir):
-            #         os.makedirs(pdir)
-            #     oib_lineplot_all(dname, str(dname['DATE'].values[0])[:10] + '_L' + str(dname['LINE'].values[0]),
-            #                     os.path.join(pdir, str(dname['LINE'].values[0])+'_forward_lineplot.png'))
+            if make_plots:
+                oib_lineplot_all(dname, str(dname['DATE'].values[0])[:10] + '_L' + str(dname['LINE'].values[0]),
+                                os.path.join(pdir, str(dname['LINE'].values[0])+'_forward_lineplot.png'))
 
             '''
             Convert OIB data to polygon arrays
@@ -230,12 +244,13 @@ def forward_oib(basedir, infile, dropturns=False, make_plots=False, diagnostics=
             gz_adj = (gz - np.nanmean(gz)) + np.nanmean(fag070)
             n = len(gz_adj)
             rmse = np.linalg.norm(gz_adj - fag070) / np.sqrt(n)
-            # print 'modeled'
+            if diagnostics:
+                print('modeled')
 
             '''
             Make new channels
             '''
-            # print 'make new channels'
+            # make new channels
             try:
                 dname.loc[:, 'rmse'] = rmse
                 dname.loc[:, 'RESIDUAL'] = gz_adj - fag070
@@ -251,33 +266,41 @@ def forward_oib(basedir, infile, dropturns=False, make_plots=False, diagnostics=
             # dnum = 7
 
             # Interpolate across NaNs in compilation bedrock
-            dflst[dnum]['RTOPO2_bedrock'].interpolate(method='linear', axis=0, inplace=True)
+            try:
+                if dname['RTOPO2_bedrock'].isnull().all():
+                    print("RTOPO2_bedrock all NaNs...setting it to -500 masl")
+                    dname['RTOPO2_bedrock'] = -500.0
+                else:
+                    dname['RTOPO2_bedrock'].interpolate(method='linear', axis=0, inplace=True)
+            except KeyError:
+                print("No RTOPO2_bedrock?")
+                dname['RTOPO2_bedrock'] = -500.0
 
             # Remove Ice Mass Contribution
 
             # Remove Water Mass Contribution
 
             # Bouguer correction rock
-            # dflst[dnum]['BOUGUER_CORR_1'] = dflst[dnum]['RTOPO2_bedrock'] * 0.0419088 * (np.abs(rho_w - rho_r)) / 1000
-            dflst[dnum]['BOUGUER_CORR'] = np.where(dflst[dnum]['RTOPO2_bedrock'] > 0,
-                                                  dflst[dnum]['RTOPO2_bedrock'] * 0.0419088 * (
+            # dname['BOUGUER_CORR_1'] = dname['RTOPO2_bedrock'] * 0.0419088 * (np.abs(rho_w - rho_r)) / 1000
+            dname['BOUGUER_CORR'] = np.where(dname['RTOPO2_bedrock'] > 0,
+                                                  dname['RTOPO2_bedrock'] * 0.0419088 * (
                                                       np.abs(rho_r)) / 1000,
-                                                  dflst[dnum]['RTOPO2_bedrock'] * 0.0419088 * (
+                                                  dname['RTOPO2_bedrock'] * 0.0419088 * (
                                                       np.abs(rho_w - rho_r)) / 1000)
 
             # Bouguer Anamoly
-            dflst[dnum]['BOUGUER_ANOMALY'] = dflst[dnum]['FAG070'] - dflst[dnum]['BOUGUER_CORR']
-            # dflst[dnum][['BOUGUER_ANOMALY', 'BOUGUER_ANOMALY_1']].plot();
+            dname['BOUGUER_ANOMALY'] = dname['FAG070'] - dname['BOUGUER_CORR']
+            # dname[['BOUGUER_ANOMALY', 'BOUGUER_ANOMALY_1']].plot();
             # plt.show()
 
             # Low-pass filter (fill NaNs first)
-            dflst[dnum]['BOUGUER_ANOMALY'].interpolate(method='cubic', axis=0, inplace=True)
+            dname['BOUGUER_ANOMALY'].interpolate(method='cubic', axis=0, inplace=True)
 
             ## Savitzky-Golay
             # from scipy import signal
-            # dflst[dnum]['BOUGUER_ANOMALY_LP'] = signal.savgol_filter(dflst[dnum]['BOUGUER_ANOMALY'].values,
+            # dname['BOUGUER_ANOMALY_LP'] = signal.savgol_filter(dname['BOUGUER_ANOMALY'].values,
             #                                                      window, 2, mode='nearest')
-            # dflst[dnum][['BOUGUER_ANOMALY', 'BOUGUER_ANOMALY_LP', 'FAG070']].plot();
+            # dname[['BOUGUER_ANOMALY', 'BOUGUER_ANOMALY_LP', 'FAG070']].plot();
             # plt.show()
 
             ## Butterworth (filtfilt)
@@ -286,24 +309,19 @@ def forward_oib(basedir, infile, dropturns=False, make_plots=False, diagnostics=
             N = 1  # Filter order
             # Wn = 0.4 # Cutoff frequency
             lp_length_wallclock = 70
-            Wn = 1 / (lp_length_wallclock / np.nanmean(np.diff(dflst[dnum]['UNIX'])))
+            Wn = 1 / (lp_length_wallclock / np.nanmean(np.diff(dname['UNIX'])))
             B, A = signal.butter(N, Wn, output='ba')
-            dflst[dnum]['BOUGUER_ANOMALY_LP'] = signal.filtfilt(B, A, dflst[dnum]['BOUGUER_ANOMALY'].values,
+            dname['BOUGUER_ANOMALY_LP'] = signal.filtfilt(B, A, dname['BOUGUER_ANOMALY'].values,
                                                                method="gust")
-            # dflst[dnum][['BOUGUER_ANOMALY', 'BOUGUER_ANOMALY_LP', 'FAG070']].plot();
-            # plt.show()
-
-            # Floating Ice
-            dflst[dnum]['D_floatice'] = np.where(dflst[dnum]['RTOPO2_icemask'] == 2, 1, np.nan)
-            # dflst[dnum][['RTOPO2_icemask', 'D_floatice']].plot();
+            # dname[['BOUGUER_ANOMALY', 'BOUGUER_ANOMALY_LP', 'FAG070']].plot();
             # plt.show()
 
             # Set bed beneath floating ice to -2000 AKA 'bedcomp'
             # TODO samples SID and only do this to UNCONSTRAINED
-            dflst[dnum]['BEDCOMP'] = np.where((dflst[dnum]['D_floatice'] != 1),# & (dflst[dnum]['D_floatice'] != 1),
-                                              dflst[dnum]['ICEBASE_horizon'],
+            dname['BEDCOMP'] = np.where((dname['D_floatice'] != 1),# & (dname['D_floatice'] != 1),
+                                              dname['ICEBASE_horizon'],
                                               -2000)
-            # dflst[dnum][['RTOPO2_bedrock', 'ICESFC_horizon', 'ICEBASE_horizon', 'BEDCOMP']].plot();
+            # dname[['RTOPO2_bedrock', 'ICESFC_horizon', 'ICEBASE_horizon', 'BEDCOMP']].plot();
             # plt.show()
 
             '''
@@ -311,9 +329,6 @@ def forward_oib(basedir, infile, dropturns=False, make_plots=False, diagnostics=
             '''
             # diagnostics = True
             if make_plots:
-                pdir = os.path.join('figs', str(dname['DATE'].values[0]))
-                if not os.path.exists(pdir):
-                    os.makedirs(pdir)
                 if diagnostics:
                     fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(12, 8))
                     axes[0].plot(xs, iceoutline, color='cyan', marker='o')
@@ -412,8 +427,8 @@ def forward_oib(basedir, infile, dropturns=False, make_plots=False, diagnostics=
 
     # Write to CSV
     if not os.path.exists(out_dir):
-        os.makedirs(outdir)
-    dfout.to_csv(os.path.join(out_dir, 'OIB_' + str(dfout['DATE'].values[0])[:10] + '_forward.csv'))
+        os.makedirs(out_dir)
+    dfout.to_csv(os.path.join(out_dir, 'IPGG84_' + str(dfout['DATE'].values[0])[:10] + '_forward.csv'))
 
 
 if __name__ == '__main__':
@@ -422,11 +437,11 @@ if __name__ == '__main__':
     # Read YAML config file
     try:
         config_file = sys.argv[1]
-        print(f"Getting processing parameters from {config_file}")
+        print("Getting processing parameters from {}".format((config_file)))
     except IndexError:
         proj_path = os.path.abspath(os.path.dirname(__file__))
         config_file = os.path.join(proj_path, 'config_runtime.yml')
-        print(f"Reading default configuration file from {proj_path}")
+        print("Reading default configuration file from {}".format((proj_path)))
     with open(config_file, 'r') as file:  #  TODO write a functino to get parameters from conig YAML all at once
         config = yaml.safe_load(file)
     base_dir = config['base_dir']
@@ -434,23 +449,32 @@ if __name__ == '__main__':
     out_dir = config['out_dir']
     prc_dir = config['prc_dir']
     flights = config['flight_list']
-    print(f"Processing flights: {flights}")
+    print("Processing flights: {}".format((flights)))
 
-    ### Run through each directory
-    pattern = os.path.join(base_dir, prc_dir, 'OIB_*' + '.csv')
-    # pattern = './data/NetCDF/10103/R10103_003*.nc'
-    filenames = sorted(glob(pattern))  # , key=alphanum_key)
-    print("Filelist:\n%s" % (filenames))
-    filecounter = len(filenames)
-    for fnum, filename in enumerate(filenames, start=0):
-        print("Data file %i is %s" % (fnum, filename))
-        # sys.exit(main(timedir))
+
+    for dirnum, dirname in enumerate(flights, start=0):
+        print('\ndnum: {}, dname: {}'.format(dirnum, dirname))
+        # filetime = str(dirname)[0:4] + str(dirname)[5:7] + str(dirname)[8:10]
+        print('\ndirname: {}'.format(dirname))
+        print('dirname parsed into time format: {}'.format(re.sub('\.', '', dirname)))
         # try:
-        forward_oib(base_dir, filename, dropturns=True, make_plots=True, diagnostics=True)
-        # except IOError:
-        #     print 'IOError - Data Not Found'
-        # except AttributeError:
-        #     print 'Attribute Error'
+        forward_oib(base_dir, dirname, config, dropturns=True, make_plots=True, diagnostics=False)
+
+    # ### Run through each directory
+    # pattern = os.path.join(base_dir, prc_dir, 'OIB_*' + '.csv')
+    # # pattern = './data/NetCDF/10103/R10103_003*.nc'
+    # filenames = sorted(glob(pattern))  # , key=alphanum_key)
+    # print("Filelist:\n%s" % (filenames))
+    # filecounter = len(filenames)
+    # for fnum, filename in enumerate(filenames, start=0):
+    #     print("Data file %i is %s" % (fnum, filename))
+    #     # sys.exit(main(timedir))
+    #     # try:
+    #     forward_oib(base_dir, filename, config, dropturns=True, make_plots=True, diagnostics=False)
+    #     # except IOError:
+    #     #     print 'IOError - Data Not Found'
+    #     # except AttributeError:
+    #     #     print 'Attribute Error'
 
     end_all = time.time()
     print('Processing took {}'.format(end_all - start_all))
